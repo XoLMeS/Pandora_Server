@@ -1,0 +1,36 @@
+{
+  "name": "Pandora_Server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "repository": "https://github.com/XoLMeS/Pandora_Server",
+  "keywords": [
+    "Electron",
+    "Node.js"
+  ],
+  "author": "XoLMeS",
+  "devDependencies": {
+    "electron": "~1.7.8"
+  },
+  "dependencies": {
+    "assert": "^1.4.1",
+    "bcrypt": "^1.0.2",
+    "body-parser": "^1.17.2",
+    "cfenv": "^1.0.4",
+    "express": "^4.15.3",
+    "fs": "0.0.1-security",
+    "mongodb": "^3.0.0-rc0",
+    "mongoose": "^4.10.6",
+    "mongoose-auto-increment": "^5.0.1",
+    "mongoose-paginate": "^5.0.3",
+    "mongoose-pagination": "https://registry.npmjs.org/mongoose-pagination/-/mongoose-pagination-1.0.0.tgz",
+    "mongoose-unique-validator": "^1.0.5",
+    "require_tree": "^0.6.8",
+    "socket.io": "^2.0.3",
+    "underscore": "https://registry.npmjs.org/underscore/-/underscore-1.8.3.tgz",
+    "util": "^0.10.3"
+  }
+}
