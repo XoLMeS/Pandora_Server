@@ -43,8 +43,8 @@ var server_inst = {
 	roles: [],
 	channels: [],
 	img: {
-		ObjectType
-		data
+		data,
+		contentType
 	}
 };
 */
@@ -66,7 +66,10 @@ Server.find({}, function(err, data){
 			users: data[a].users,
 			roles: data[a].roles,
 			channels: data[a].channels,
-			img: data[a].img.data
+			img: {
+				data: data[a].img.data,
+				contentType: data[a].img.contentType
+			}
 		}
 		console.log("Server #" + a + " '"+ data[a].title+"'");
 	}
@@ -117,7 +120,10 @@ Server.find({}, function(err, data){
 					users: server.users,
 					roles: server.roles,
 					channels: server.channels,
-					img: server.img.data
+					img: {
+						data: server.img.data,
+						contentType: server.img.contentType
+					}
 				});
 				
 			});
@@ -232,11 +238,26 @@ Server.find({}, function(err, data){
 					});
 					return;
 				}
-				// Success
-				res.send({
-					success: true,
-					user: data
-				})
+				
+				Server.findByIdAndUpdate(	
+					servers[0].id,
+					{$push: {"users": req.body.user_login}},
+					{safe: true, upsert: true},
+					
+					function(err, server) {
+						if (err || !server) {
+							socket.emit('error', "'New user, push in Global' - failed");
+							return;
+						}
+						
+						// Success
+						res.send({
+							success: true,
+							user: data
+						})
+					}
+				);
+			
 			})
 		});
 
@@ -258,9 +279,15 @@ Server.find({}, function(err, data){
 				var newServer = new Server({
 					title: req.body.title,
 					channels: channel.id,
-					img: req.body.img
+					img: {
+						data: Buffer.from(req.body.img.data, 'base64'),
+						contentType: req.body.img.contentType
+					}
 				});
 				
+				// Test
+				console.log("New Server req.body.img");
+				console.log(req.body.img);
 				
 				// If no image passed in POST
 				if(req.body.img == undefined){
@@ -292,13 +319,16 @@ Server.find({}, function(err, data){
 						users: [],
 						roles: server.roles,
 						channels: server.channels,
-						img: req.body.img
+						img: {
+							data: server.img.data,
+							contentType: server.img.contentType
+						}
 					});
 					
 					// Send response
 					res.send({
 						success: true,
-						server: server
+						serverId: server.id
 					});
 				});
 			});
@@ -392,7 +422,7 @@ io.on('connection', function(socket) {
 				var toSend = [];
 				// Join user to servers
 				for(let a = 0; a < user.servers.length; a++){
-					socket.join(user.servers);
+					socket.join(user.servers[a]);
 					
 					// tell everyone
 					io.sockets.in(user.servers[a]).emit('new user online', {username: name, serverId: user.servers[a]});
@@ -405,8 +435,13 @@ io.on('connection', function(socket) {
 							toSend.push({
 								title: servers[b].title,
 								id: servers[b].id,
-								img: servers[b].img
+								img: {
+									data: servers[b].img.data,
+									contentType: servers[b].img.contentType
+								}
 							});
+							// Test
+							console.log("Send server info " + servers[b].img.contentType);
 						}
 					}
 				}
@@ -416,13 +451,72 @@ io.on('connection', function(socket) {
 		
 	});
 	
+	socket.on('join server', function(data){
+		User.findOneAndUpdate(
+		{username: data.username},
+		{$push: {"servers": data.serverId}},
+		{safe: true, upsert: true},
+			function(err, user) {
+				if (err || !user) {
+					socket.emit('error', "'Join server' - failed");
+					return;
+				}
+				
+				// Join user to server
+				socket.join(data.serverId);
+				
+				// tell everyone
+				io.sockets.in(data.serverId).emit('new user online', {username: data.username, serverId: data.serverId});
+				
+				// Add user to server in [current_users]
+				for(let b = 0; b < servers.length; b++){
+					if(servers[b].id == data.serverId){
+						servers[b].current_users.push(user.username);
+						
+						Server.findByIdAndUpdate(	
+							data.serverId,
+							{$push: {"users": data.username}},
+							{safe: true, upsert: true},
+							
+							function(err, server) {
+								if (err || !server) {
+									socket.emit('error', "'Join server' - failed");
+									return;
+								}
+							}
+						);
+						
+						let toSend = {
+							title: servers[b].title,
+							id: servers[b].id,
+							img: {
+								data: servers[b].img.data,
+								contentType: servers[b].img.contentType
+							}
+						}
+						socket.emit('add server', toSend);
+					}
+				}
+			}
+		);
+	});
+	
 
 	// Send 
-		// Send current users of selected server
+		// Send list of current users of selected server
 		socket.on('currentUsers',function (serverId){
 			for(let a = 0; a < servers.length; a++){
 				if(servers[a].id == serverId){
 					socket.emit('currentUsers', servers[a].current_users);
+				}
+			}
+		});
+		
+		// Send list of users of selected server
+		socket.on('currentUsers',function (serverId){
+			for(let a = 0; a < servers.length; a++){
+				if(servers[a].id == serverId){
+					socket.emit('users', servers[a].users);
 				}
 			}
 		});
@@ -506,6 +600,7 @@ io.on('connection', function(socket) {
 			console.log("Messages retrieved" + result+ err)
 		});
 	});
+	
 
 });
 
